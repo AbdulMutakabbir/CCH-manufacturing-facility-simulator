@@ -14,7 +14,7 @@ class FEL:
 
     # constructor
     def __init__(self):
-        self.__queue = {}
+        self.__queue:dict = {}
 
     # adds events to FEL
     def put_event(self, event, time):
