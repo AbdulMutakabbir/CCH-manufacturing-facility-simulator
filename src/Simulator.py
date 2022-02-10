@@ -116,6 +116,7 @@ class Simulator:
 
     # returns the next processing time for workstations
     def __get_workstation_next_processing_time(self, w_id) -> int:
+        processing_time = None
         if w_id == 1:
             if len(self.WS1_queue) == 0:
                 return None
@@ -128,18 +129,18 @@ class Simulator:
             if len(self.WS3_queue) == 0:
                 return None
             processing_time = self.WS3_queue.pop(0)
-        return self.convert_time_to_int(processing_time)
+        return self.__convert_time_to_int(processing_time)
 
     # returns a component C1 for Inspector 1
-    def get_i1_next_component(self) -> tuple:
+    def __get_i1_next_component(self) -> tuple:
         if len(self.I11_queue) == 0:
             return None, None
         inspection_time = self.I11_queue.pop(0)
         component = Component(1)
-        return self.convert_time_to_int(inspection_time), component
+        return self.__convert_time_to_int(inspection_time), component
 
     # returns randomly a component to Inspector 2
-    def get_i2_next_component(self) -> tuple:
+    def __get_i2_next_component(self) -> tuple:
         if len(self.I22_queue) == 0 and len(self.I23_queue) == 0:
             return None, None
         elif len(self.I22_queue) == 0:
@@ -154,19 +155,19 @@ class Simulator:
         else:
             inspection_time = self.I23_queue.pop(0)
             component = Component(3)
-        return self.convert_time_to_int(inspection_time), component
+        return self.__convert_time_to_int(inspection_time), component
 
     # increment system clock
-    def inc_clock(self):
+    def __inc_clock(self):
         self.sys_clock += 1
 
     # converts float dataset to integer dataset
     @staticmethod
-    def convert_time_to_int(time) -> int:
+    def __convert_time_to_int(time) -> int:
         return int(1000 * time)
 
     # returns the buffer_id based on component
-    def send_to_buffer(self, inspector_id, component) -> int:
+    def __send_to_buffer(self, inspector_id, component) -> int:
         if inspector_id == 1:
             b1_capacity = self.__buffers[0].capacity
             b2_capacity = self.__buffers[1].capacity
@@ -187,8 +188,8 @@ class Simulator:
     # main function running the simulation
     def run_simulation(self):
         # get first components to Inspector 1 & 2
-        (new_I1_time, I1_component) = self.get_i1_next_component()
-        (new_I2_time, I2_component) = self.get_i2_next_component()
+        (new_I1_time, I1_component) = self.__get_i1_next_component()
+        (new_I2_time, I2_component) = self.__get_i2_next_component()
 
         # add inspection events to FEL
         self.FEL.put_event((EventType.arrival, ItemType.component, I1_component), 0)
@@ -200,11 +201,11 @@ class Simulator:
         self.FEL.put_event((EventType.departure, ItemType.component, I1_component), new_I1_time)
         self.FEL.put_event((EventType.departure, ItemType.component, I2_component), new_I2_time)
 
-        self.inc_clock()  # finish first cycle
+        self.__inc_clock()  # finish first cycle
 
-        SIM_TIME = 99999999
+        __sim_time = 99999999
         # run simulation till specified time
-        while self.sys_clock <= SIM_TIME:
+        while self.sys_clock <= __sim_time:
 
             # get all current events
             events = self.FEL.get_events(self.sys_clock)
@@ -221,7 +222,7 @@ class Simulator:
                 inspector_id = 1 if component.get_type() == 1 else 2
 
                 # get the buffer for the event
-                buffer_id = self.send_to_buffer(inspector_id=inspector_id, component=component)
+                buffer_id = self.__send_to_buffer(inspector_id=inspector_id, component=component)
 
                 # check if the event either:
                 #       1. Component finished being inspected
@@ -240,11 +241,13 @@ class Simulator:
                         self.__inspectors[inspector_id - 1].send_component()
                         self.__buffers[buffer_id - 1].insert_component(component=component)
 
-                        # get new component for inspection
+                        # get new component for inspection time
+                        new_component = None
+                        new_time = None
                         if inspector_id == 1:
-                            (new_time, new_component) = self.get_i1_next_component()
+                            (new_time, new_component) = self.__get_i1_next_component()
                         elif inspector_id == 2:
-                            (new_time, new_component) = self.get_i2_next_component()
+                            (new_time, new_component) = self.__get_i2_next_component()
 
                         # create events for new component
                         self.FEL.put_event((EventType.arrival, ItemType.component, new_component), self.sys_clock)
@@ -266,10 +269,9 @@ class Simulator:
                     self.FEL.put_event((EventType.departure, ItemType.product), self.sys_clock + processing_time)
 
             # increment system Clock
-            self.inc_clock()
+            self.__inc_clock()
 
         #   ----------- Simulation Ends -----------------
 
         # Print FEL
         self.FEL.print()
-
