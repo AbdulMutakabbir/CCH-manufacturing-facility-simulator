@@ -39,4 +39,4 @@ def chi_square(filename="", title="", bin_bias=0, base_location=""):
     histogram["(O-E)^2/E"] = (histogram["O-E"] ** 2) / histogram["expected_frequency"]
     histogram["range"] = histogram["range"].astype(str)
 
-    histogram.to_csv(base_location + "ChiSquare " + title)
+    histogram.to_csv(base_location + "ChiSquare " + title + ".csv")
