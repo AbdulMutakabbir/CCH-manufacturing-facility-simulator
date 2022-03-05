@@ -23,8 +23,8 @@ def plot_hist(filename="", title="", bin_bias=0, base_location=""):
 
     x_ticks = range(0, max_data_value + bin_step, bin_step)
 
-    bar_color = (0.5, 0.5, 0.7, 0.2)
-    bar_border_color = (0.3, 0.3, 0.7, 0.8)
+    bar_color = (1.0, 0.5, 0.2, 0.2)
+    bar_border_color = (1.0, 0.5, 0.5, 0.8)
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
