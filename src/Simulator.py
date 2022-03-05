@@ -79,8 +79,8 @@ class Simulator:
         self.WS3_queue = self.__get_list_from_file(self.WS3_TIME_DATA_FILE)
 
         # init inspectors
-        i1 = Inspector(type=1)
-        i2 = Inspector(type=2)
+        i1 = Inspector(i_type=1)
+        i2 = Inspector(i_type=2)
         self.__inspectors.append(i1)
         self.__inspectors.append(i2)
 
@@ -169,9 +169,9 @@ class Simulator:
     # returns the buffer_id based on component
     def __send_to_buffer(self, inspector_id, component) -> int:
         if inspector_id == 1:
-            b1_capacity = self.__buffers[0].capacity
-            b2_capacity = self.__buffers[1].capacity
-            b4_capacity = self.__buffers[3].capacity
+            b1_capacity = self.__buffers[0].get_capacity()
+            b2_capacity = self.__buffers[1].get_capacity()
+            b4_capacity = self.__buffers[3].get_capacity()
 
             if b1_capacity <= b2_capacity and b1_capacity <= b4_capacity:
                 return 1
@@ -203,7 +203,7 @@ class Simulator:
 
         self.__inc_clock()  # finish first cycle
 
-        __sim_time = 99999999
+        __sim_time = 99999
         # run simulation till specified time
         while self.sys_clock <= __sim_time:
 

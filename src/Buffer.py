@@ -22,9 +22,16 @@ class Buffer:
         self._capacity = 0
         self.__queue = []
 
+    # returns buffers capacity
+    def get_capacity(self):
+        if self._capacity is None:
+            raise Exception("NotInitializedComponent")
+        else:
+            return self._capacity
+
     # performs the actions for inserting component into a buffer
     def insert_component(self, component):
-        if self.is_empty is None or self.is_full is None or self.__priority is None or self.queue is None:
+        if self.is_empty is None or self.is_full is None or self.__priority is None or self.__queue is None:
             raise Exception("BufferNotInitialized")
         else:
             if not self.is_full:
@@ -38,7 +45,7 @@ class Buffer:
 
     # performs the actions for removing component from buffer
     def send_component(self):
-        if self.is_empty is None or self.is_full is None or self.__priority is None or self.queue is None:
+        if self.is_empty is None or self.is_full is None or self.__priority is None or self.__queue is None:
             raise Exception("BufferNotInitialized")
         else:
             if not self.is_empty:
