@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from numpy import log as ln
 
 
-def plot(filename="", title="", base_location=""):
+def plot_QQ(filename="", title="", base_location=""):
     if (filename == "") or (base_location == ""):
         raise Exception("Incorrect File Name")
 
