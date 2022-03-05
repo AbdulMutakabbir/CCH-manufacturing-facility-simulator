@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import math
 
 
-def plot(filename="", title="", bin_bias=0, base_location=""):
+def plot_hist(filename="", title="", bin_bias=0, base_location=""):
     if (filename == "") or (base_location == ""):
         raise Exception("Incorrect File Name")
 
