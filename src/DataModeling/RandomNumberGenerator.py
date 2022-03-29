@@ -48,8 +48,8 @@ def rand_test(base_location):
     ax.set_ylabel("Frequency")
     plt.savefig(base_location + expo_title)
     plt.close(fig)
-    # histogram = pd.cut(rand_expo, range(0, 100, 10)).value_counts().sort_index()
-    # print(histogram)
+    histogram = pd.cut(rand_expo, range(0, 100, 10)).value_counts().sort_index()
+    print(histogram)
 
     for _ in range(n):
         rand_uni.append(r.random_probability())
@@ -64,5 +64,6 @@ def rand_test(base_location):
     ax.set_ylabel("Frequency")
     plt.savefig(base_location + uni_title)
     plt.close(fig)
-    # histogram = pd.cut(rand_uni, [_/10 for _ in range(0, 100, 10)]).value_counts().sort_index()
-    # print(histogram)
+    histogram = pd.cut(rand_uni, [_/100 for _ in range(0, 100, 10)]).value_counts().sort_index()
+    print(histogram)
+    print(rand_uni[:10])

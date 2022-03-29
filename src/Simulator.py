@@ -14,7 +14,7 @@ class FEL:
 
     # constructor
     def __init__(self):
-        self.__queue:dict = {}
+        self.__queue = {}
 
     # adds events to FEL
     def put_event(self, event, time):
@@ -44,7 +44,7 @@ class EventType(enum.Enum):
 # Enumerated class to hold on which item the event occurred
 class ItemType(enum.Enum):
     component = 0
-    product = 0
+    product = 1
 
 
 # Class that holds the simulation environment and runs the main simulation code
@@ -186,7 +186,14 @@ class Simulator:
                 return 5
 
     # main function running the simulation
-    def run_simulation(self):
+    def run_simulation(self, sim_time=499999):
+        end_sim_flag = False
+
+        products_count = [0, 0, 0]
+        workstations_busy_count = [0, 0, 0]
+        buffer_occupancy_count = [0, 0, 0, 0, 0]
+        inspector_block_count = [0, 0]
+
         # get first components to Inspector 1 & 2
         (new_I1_time, I1_component) = self.__get_i1_next_component()
         (new_I2_time, I2_component) = self.__get_i2_next_component()
@@ -203,10 +210,8 @@ class Simulator:
 
         self.__inc_clock()  # finish first cycle
 
-        __sim_time = 99999
         # run simulation till specified time
-        while self.sys_clock <= __sim_time:
-
+        while self.sys_clock <= sim_time:
             # get all current events
             events = self.FEL.get_events(self.sys_clock)
 
@@ -216,57 +221,112 @@ class Simulator:
                 # extract event info
                 e_type = event[0]
                 i_type = event[1]
-                component = event[2]
 
-                # get the inspector for the event
-                inspector_id = 1 if component.get_type() == 1 else 2
+                # check if the event is -- Component finished being inspected
+                if (e_type == EventType.departure) and (i_type == ItemType.component):
+                    component = event[2]
+                    # get the inspector for the event
+                    inspector_id = 1 if component.get_type() == 1 else 2
+                    # get the buffer for the event
+                    buffer_id = self.__send_to_buffer(inspector_id=inspector_id, component=component)
 
-                # get the buffer for the event
-                buffer_id = self.__send_to_buffer(inspector_id=inspector_id, component=component)
+                    #   perform the actions:
+                    #       inspector sends component
+                    #       insert component to buffer
+                    self.__inspectors[inspector_id - 1].send_component()
+                    self.__buffers[buffer_id - 1].insert_component(component=component)
+                    print(f"Log:\tFinished Comp: {component.get_type()}")
 
-                # check if the event either:
-                #       1. Component finished being inspected
-                #       2. Component inspection is halted due to full buffer
-                if ((e_type == EventType.departure) or (e_type == EventType.delay)) and (i_type == ItemType.component):
-                    # if 2 add a delay event to check later
-                    if self.__buffers[buffer_id - 1].is_full:
-                        self.FEL.put_event((EventType.delay, ItemType.component, component), self.sys_clock + 1)
-                    # if 1
-                    #   perform the actions
-                    #   get new component for inspection
-                    #   create events for new component
-                    #   perform actions for the new Component
-                    else:
-                        # performing actions for the event
-                        self.__inspectors[inspector_id - 1].send_component()
-                        self.__buffers[buffer_id - 1].insert_component(component=component)
+                # check if the event is -- Product built
+                if (e_type == EventType.departure) and (i_type == ItemType.product):
+                    product = event[2]
+                    # get the workstation for the event
+                    workstation_id = product.get_type()
+                    product_type = product.get_type()
 
-                        # get new component for inspection time
-                        new_component = None
-                        new_time = None
-                        if inspector_id == 1:
-                            (new_time, new_component) = self.__get_i1_next_component()
-                        elif inspector_id == 2:
-                            (new_time, new_component) = self.__get_i2_next_component()
+                    #   perform the actions:
+                    #       finish building product
+                    self.__workstations[workstation_id - 1].finish_building_product()
 
-                        # create events for new component
-                        self.FEL.put_event((EventType.arrival, ItemType.component, new_component), self.sys_clock)
-                        self.FEL.put_event((EventType.departure, ItemType.component, new_component),
-                                           self.sys_clock + new_time)
+                    # increment product production count
+                    products_count[product_type - 1] += 1
 
-                        # perform actions on the new component
-                        self.__inspectors[inspector_id - 1].inspect_component(I1_component, new_I1_time)
+                    print(f"Log:\tProduced Product: {product_type}")
 
             # Check all workstations
             for workstation in self.__workstations:
-                # if workstation is ideal and can build products build product
-                if not workstation.is_making_product and workstation.can_dequeue_buffers():
-                    w_id = workstation.type
-                    processing_time = self.__get_workstation_next_processing_time(w_id=w_id)
+                can_dequeue = workstation.can_dequeue_buffers()
 
-                    # add the product building events
-                    self.FEL.put_event((EventType.arrival, ItemType.product), self.sys_clock)
-                    self.FEL.put_event((EventType.departure, ItemType.product), self.sys_clock + processing_time)
+                workstation_id = workstation.get_type()
+
+                # increment workstation busy time if it is busy
+                if workstation.is_making_product:
+                    workstations_busy_count[workstation_id - 1] += 1
+
+                # if workstation is ideal and can build products build product
+                if (not workstation.is_making_product) and (can_dequeue):
+                    processing_time = self.__get_workstation_next_processing_time(w_id=workstation_id)
+
+                    # start building product
+                    is_building, product = workstation.start_building_product(processing_time)
+
+                    if is_building:
+                        # add the product building events
+                        self.FEL.put_event((EventType.arrival, ItemType.product, product), self.sys_clock)
+                        self.FEL.put_event((EventType.departure, ItemType.product, product), self.sys_clock + processing_time)
+                        print(f"Log:\tStarted building Product: {workstation_id}")
+
+            # Check all inspectors
+            for inspector in self.__inspectors:
+                inspector_id = inspector.get_type()
+
+                # Check if inspector is not inspecting
+                if not self.__inspectors[inspector_id - 1].is_inspecting:
+                    new_component = None
+                    new_time = None
+                    if inspector_id == 1:
+                        new_time, new_component = self.__get_i1_next_component()
+                    elif inspector_id == 2:
+                        new_time, new_component = self.__get_i2_next_component()
+
+                    if new_component is None:
+                        print("Component List Finished")
+                        end_sim_flag = True
+                        break
+
+                    buffer_id = self.__send_to_buffer(inspector_id=inspector_id, component=new_component)
+
+                    # if inspector buffer are not full inspect
+                    if not self.__buffers[buffer_id - 1].is_full:
+                        # create events for new component
+                        self.FEL.put_event((EventType.arrival, ItemType.component, new_component), self.sys_clock)
+                        self.FEL.put_event((EventType.departure, ItemType.component, new_component),
+                                       self.sys_clock + new_time)
+
+                        # perform actions on the new component
+                        self.__inspectors[inspector_id - 1].inspect_component(new_component, new_I1_time)
+                        print("Log: \tStarted Inspecting Component:", new_component.get_type())
+
+                    # inspector buffers are full put the component back on hold
+                    # and increment inspector block time
+                    else:
+                        new_component_type = new_component.get_type()
+                        if new_component_type == 1:
+                            self.I11_queue.insert(0, new_time)
+                        elif new_component_type == 2:
+                            self.I22_queue.insert(0, new_time)
+                        elif new_component_type == 3:
+                            self.I23_queue.insert(0, new_time)
+
+                        # increment inspector block time
+                        inspector_block_count[inspector_id - 1] += 1
+
+            # Increment buffer capacity count
+            for index, buffer in enumerate(self.__buffers):
+                buffer_occupancy_count[index] += buffer.get_capacity()
+
+            if end_sim_flag == True:
+                break
 
             # increment system Clock
             self.__inc_clock()
@@ -274,4 +334,41 @@ class Simulator:
         #   ----------- Simulation Ends -----------------
 
         # Print FEL
-        self.FEL.print()
+        # self.FEL.print()
+
+        products_throughput = []
+        for product_count in products_count:
+            try:
+                products_throughput.append(product_count/self.sys_clock*1000)
+            except ZeroDivisionError:
+                products_throughput.append(None)
+
+        probability_workstation_busy = []
+        avg_wait_time = []
+        for index, busy_count in enumerate(workstations_busy_count):
+            probability_workstation_busy.append(busy_count/self.sys_clock)
+            try:
+                avg_wait_time.append(busy_count/products_count[index])
+            except ZeroDivisionError:
+                avg_wait_time.append(None)
+
+        avg_buffer_occupancy = []
+        for occupancy_count in buffer_occupancy_count:
+            avg_buffer_occupancy.append(occupancy_count/self.sys_clock)
+
+        probability_inspector_blocked = []
+        for block_time in inspector_block_count:
+            probability_inspector_blocked.append(block_time/self.sys_clock)
+
+        for index, throughput in enumerate(products_throughput):
+            print(f"Product {index + 1} throughput: {throughput}")
+        for index, probability_busy in enumerate(probability_workstation_busy):
+            print(f"Workstation {index + 1} busy probability: {probability_busy}")
+        for index, wait_time in enumerate(avg_wait_time):
+            print(f"Workstation {index + 1} wait time: {wait_time}")
+        for index, product_count_value in enumerate(product_count):
+            print(f"Workstation {index + 1} count: {product_count_value}")
+        for index, occupancy in enumerate(avg_buffer_occupancy):
+            print(f"Buffer {index + 1} average occupancy: {occupancy}")
+        for index, probability_blocked in enumerate(probability_inspector_blocked):
+            print(f"Inspector {index + 1} block probability: {probability_blocked}")

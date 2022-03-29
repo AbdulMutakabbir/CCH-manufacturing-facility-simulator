@@ -34,22 +34,26 @@ class Workstation:
         if self.is_making_product:
             raise Exception("WorkstationInProduction")
         else:
+            product = None
             can_dequeue = self.can_dequeue_buffers()
+            self.dequeue_buffers()
             if can_dequeue:
                 self.is_making_product = True
                 self.__processing_time = build_time
-                return True
+                self.is_built = False
+                product = self.get_product()
+                return True, product
             else:
-                return False
+                return False, product
 
     # remove components from buffers to build the product
     def dequeue_buffers(self):
         if self.can_dequeue_buffers():
             if self.__type == 1:
-                self.__buffers[0].pop(0)
+                self.__buffers[0].send_component()
             if self.__type == 2 or self.__type == 3:
-                self.__buffers[0].pop(0)
-                self.__buffers[1].pop(0)
+                self.__buffers[0].send_component()
+                self.__buffers[1].send_component()
 
     # check if there are enough components to build the product
     def can_dequeue_buffers(self):
@@ -57,7 +61,7 @@ class Workstation:
             if self.__type == 1:
                 return True
             if self.__type == 2 or self.__type == 3:
-                if not self.__buffers[1].is_empty():
+                if not self.__buffers[1].is_empty:
                     return True
                 else:
                     return False
@@ -65,14 +69,27 @@ class Workstation:
             return False
 
     # perform the action to make the product
-    def get_product(self):
-        if self.is_built is not None and (self.is_built == True):
+    def finish_building_product(self):
+        if self.is_built is not None:
             self.is_built = False
             self.is_making_product = False
             self.__processing_time = None
+        else:
+            raise Exception("ProductionInProcess")
+
+    # get workstations product
+    def get_product(self):
+        if self.is_built is not None and (self.is_making_product == True):
             return Product(self.__type)
         else:
             raise Exception("ProductionInProcess")
+
+    # returns the workstation  type
+    def get_type(self):
+        if self.__type is None:
+            raise Exception("NotInitializedWorkstation")
+        else:
+            return self.__type
 
     # def progress_build(self):
     #     if self.processing_time is not None and self.processing_time == 0:

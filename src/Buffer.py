@@ -37,6 +37,7 @@ class Buffer:
             if not self.is_full:
                 self.__queue.append(component)
                 self._capacity = len(self.__queue)
+                self.is_empty = False
                 if len(self.__queue) >= 2:
                     self.is_full = True
                 return True
