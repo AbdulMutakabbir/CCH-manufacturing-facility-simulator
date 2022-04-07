@@ -53,6 +53,7 @@ class Simulator:
     __buffers = []  # list of buffers
     __workstations = []   # list of workstations
     sys_clock = 0   # system clock
+    __last_buffer = 4  # buffer tracking for policy 2
 
     # dataset file locations
     base_path = os.path.realpath(__file__) + os.sep + os.pardir + os.sep + os.pardir + os.sep + "dataset" + os.sep
@@ -166,8 +167,8 @@ class Simulator:
     def __convert_time_to_int(time) -> int:
         return int(1000 * time)
 
-    # returns the buffer_id based on component
-    def __send_to_buffer(self, inspector_id, component) -> int:
+    # returns the buffer_id based on component for policy 1
+    def __send_to_buffer_policy_1(self, inspector_id, component) -> int:
         if inspector_id == 1:
             b1_capacity = self.__buffers[0].get_capacity()
             b2_capacity = self.__buffers[1].get_capacity()
@@ -184,6 +185,52 @@ class Simulator:
                 return 3
             if c_type == 3:
                 return 5
+
+    # returns the buffer_id based on component for policy 2
+    def __send_to_buffer_policy_2(self, inspector_id, component) -> int:
+        b1_capacity = self.__buffers[0].get_capacity()
+        b2_capacity = self.__buffers[1].get_capacity()
+        b4_capacity = self.__buffers[3].get_capacity()
+
+        # apply round robin if any buffer is empty for inspector 1
+        if (inspector_id == 1) and ((b1_capacity == 0) or (b2_capacity == 0) or (b4_capacity == 0)):
+            if self.__last_buffer == 1:
+                self.__last_buffer = 2
+                if b2_capacity == 0:
+                    self.__last_buffer = 2
+                    return 2
+                elif b4_capacity == 0:
+                    return 4
+                else:
+                    return 1
+
+            elif self.__last_buffer == 2:
+                self.__last_buffer = 4
+                if b4_capacity == 0:
+                    return 4
+                elif b1_capacity == 0:
+                    return 1
+                else:
+                    return 2
+            elif self.__last_buffer == 4:
+                self.__last_buffer = 1
+                if b1_capacity == 0:
+                    return 1
+                elif b2_capacity == 0:
+                    return 2
+                else:
+                    return 4
+            else:
+                raise Exception("Unknown Last buffer")
+        # else do the old policy 1
+        else:
+            buffer = self.__send_to_buffer_policy_1(inspector_id, component)
+            return buffer
+
+    # returns the buffer_id based on component
+    def __send_to_buffer(self, inspector_id, component) -> int:
+        buffer = self.__send_to_buffer_policy_2(inspector_id, component)
+        return buffer
 
     # main function running the simulation
     def run_simulation(self, sim_time=499999):
@@ -264,7 +311,7 @@ class Simulator:
                     workstations_busy_count[workstation_id - 1] += 1
 
                 # if workstation is ideal and can build products build product
-                if (not workstation.is_making_product) and (can_dequeue):
+                if (not workstation.is_making_product) and can_dequeue:
                     processing_time = self.__get_workstation_next_processing_time(w_id=workstation_id)
 
                     # start building product
@@ -273,7 +320,8 @@ class Simulator:
                     if is_building:
                         # add the product building events
                         self.FEL.put_event((EventType.arrival, ItemType.product, product), self.sys_clock)
-                        self.FEL.put_event((EventType.departure, ItemType.product, product), self.sys_clock + processing_time)
+                        self.FEL.put_event((EventType.departure, ItemType.product, product), self.sys_clock +
+                                           processing_time)
                         print(f"Log:\tStarted building Product: {workstation_id}")
 
             # Check all inspectors
@@ -301,7 +349,7 @@ class Simulator:
                         # create events for new component
                         self.FEL.put_event((EventType.arrival, ItemType.component, new_component), self.sys_clock)
                         self.FEL.put_event((EventType.departure, ItemType.component, new_component),
-                                       self.sys_clock + new_time)
+                                           self.sys_clock + new_time)
 
                         # perform actions on the new component
                         self.__inspectors[inspector_id - 1].inspect_component(new_component, new_I1_time)
@@ -325,7 +373,7 @@ class Simulator:
             for index, buffer in enumerate(self.__buffers):
                 buffer_occupancy_count[index] += buffer.get_capacity()
 
-            if end_sim_flag == True:
+            if end_sim_flag:
                 break
 
             # increment system Clock
@@ -339,7 +387,7 @@ class Simulator:
         products_throughput = []
         for product_count in products_count:
             try:
-                products_throughput.append(product_count/self.sys_clock*1000)
+                products_throughput.append(product_count/(self.sys_clock/1000))
             except ZeroDivisionError:
                 products_throughput.append(None)
 
@@ -348,7 +396,7 @@ class Simulator:
         for index, busy_count in enumerate(workstations_busy_count):
             probability_workstation_busy.append(busy_count/self.sys_clock)
             try:
-                avg_wait_time.append(busy_count/products_count[index])
+                avg_wait_time.append(busy_count/products_count[index]/1000)
             except ZeroDivisionError:
                 avg_wait_time.append(None)
 
@@ -366,8 +414,8 @@ class Simulator:
             print(f"Workstation {index + 1} busy probability: {probability_busy}")
         for index, wait_time in enumerate(avg_wait_time):
             print(f"Workstation {index + 1} wait time: {wait_time}")
-        for index, product_count_value in enumerate(product_count):
-            print(f"Workstation {index + 1} count: {product_count_value}")
+        for index, product_count_value in enumerate(products_count):
+            print(f"Workstation {index + 1} products produced: {product_count_value}")
         for index, occupancy in enumerate(avg_buffer_occupancy):
             print(f"Buffer {index + 1} average occupancy: {occupancy}")
         for index, probability_blocked in enumerate(probability_inspector_blocked):

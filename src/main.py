@@ -4,7 +4,7 @@ from Simulator import Simulator
 # main function for simulator
 def main():
     sim = Simulator()
-    sim.run_simulation(sim_time=499999)
+    sim.run_simulation(sim_time=899999)
 
 
 # run main function
